@@ -1,5 +1,5 @@
-team_name,avg_goals_for,avg_goals_against
-Palmeiras,1.8,0.9
-Corinthians,1.1,1.0
-Red Bull Bragantino,1.9,1.2
-Atlético Mineiro,1.7,0.8
+team_name,avg_goals_for,avg_goals_against,league,game_time,team_analysis_snippet
+Palmeiras,1.8,0.9,Brasileirão Série A,21:00,possui um dos elencos mais fortes do país e uma defesa muito disciplinada
+Corinthians,1.1,1.0,Brasileirão Série A,21:00,é conhecido por jogos táticos e uma defesa que sofre poucos gols
+Red Bull Bragantino,1.9,1.2,Brasileirão Série A,18:30,tem um estilo de jogo ofensivo e agressivo, marcando muitos gols
+Atlético Mineiro,1.7,0.8,Brasileirão Série A,18:30,combina um ataque poderoso com uma das defesas mais sólidas do campeonato
