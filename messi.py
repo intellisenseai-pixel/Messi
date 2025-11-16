@@ -19,25 +19,20 @@ def run_flask_app():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# --- MÓDULO TRADUTOR V11.0 ---
+# --- Módulo Tradutor V11.0 (sem alterações) ---
 TEAM_NAME_TRANSLATOR = {
-    # Seleções
     "alemanha": "germany", "inglaterra": "england", "frança": "france",
     "espanha": "spain", "itália": "italy", "portugal": "portugal",
     "holanda": "netherlands", "brasil": "brazil", "argentina": "argentina",
     "bélgica": "belgium", "croácia": "croatia", "uruguai": "uruguay",
     "hungria": "hungary", "irlanda": "ireland",
-    # Clubes PT -> EN
     "atlético mineiro": "atletico-mg", "atletico mineiro": "atletico-mg",
     "red bull bragantino": "bragantino", "bragantino": "bragantino",
-    # Adicionar mais traduções aqui conforme necessário
 }
-
 def translate_team_name(name: str) -> str:
-    """Traduz o nome do time para o formato da API."""
     return TEAM_NAME_TRANSLATOR.get(name.lower(), name)
 
-# --- MÓDULO DE DADOS EM TEMPO REAL (API-FOOTBALL) V11.0 ---
+# --- MÓDULO DE DADOS EM TEMPO REAL (API-FOOTBALL) V12.0 ---
 API_URL = "https://v3.football.api-sports.io"
 API_HEADERS = {}
 
@@ -52,10 +47,9 @@ def initialize_api( ):
     return True
 
 def get_real_game_data(home_team_name: str, away_team_name: str) -> dict | None:
-    """Busca dados reais usando nomes traduzidos."""
+    """Busca dados reais usando a lógica do Detetive Implacável."""
     if not API_HEADERS: return {"error": "API Key não configurada."}
     
-    # A MUDANÇA CRÍTICA ESTÁ AQUI
     home_team_api_name = translate_team_name(home_team_name)
     away_team_api_name = translate_team_name(away_team_name)
     
@@ -74,19 +68,21 @@ def get_real_game_data(home_team_name: str, away_team_name: str) -> dict | None:
         home_id = team_ids[home_team_name]
         away_id = team_ids[away_team_name]
 
-        # 2. Encontrar o próximo jogo (lógica inalterada)
+        # 2. LÓGICA DO DETETIVE IMPLACÁVEL
+        logger.info(f"Buscando todos os jogos futuros para o time ID: {home_id}...")
         response = requests.get(f"{API_URL}/fixtures", headers=API_HEADERS, params={"team": home_id, "season": datetime.now().year})
         response.raise_for_status()
         fixtures = response.json()['response']
         
         target_fixture = None
         for fixture in fixtures:
-            if (fixture['teams']['home']['id'] == home_id and fixture['teams']['away']['id'] == away_id) or \
-               (fixture['teams']['home']['id'] == away_id and fixture['teams']['away']['id'] == home_id):
+            # Verifica se o adversário é o time que procuramos
+            if fixture['teams']['away']['id'] == away_id or fixture['teams']['home']['id'] == away_id:
                 # Verifica se o jogo ainda não aconteceu
-                if datetime.fromtimestamp(fixture['fixture']['timestamp']) > datetime.now():
+                if datetime.fromtimestamp(fixture['fixture']['timestamp'], tz=timezone.utc) > datetime.now(timezone.utc):
                     target_fixture = fixture
-                    break
+                    logger.info(f"Jogo encontrado! Fixture ID: {fixture['fixture']['id']}")
+                    break # Encontrou o primeiro jogo futuro, para a busca
         
         if not target_fixture: return {"error": f"Nenhum jogo futuro encontrado entre {home_team_name} e {away_team_name}."}
 
@@ -137,7 +133,7 @@ def get_real_game_data(home_team_name: str, away_team_name: str) -> dict | None:
         return {"error": f"Erro interno ao processar dados do jogo: {e}"}
 
 # --- Núcleo Analítico, Formatação e Main ---
-# (Nenhuma alteração significativa, apenas ajustes para usar os novos dados)
+# (Nenhuma alteração aqui, eles apenas consomem os dados que o detetive encontra)
 async def arsenal_core_analysis(prompt: str) -> dict:
     try:
         teams_part = prompt.lower().split("analise o jogo")[1]
@@ -188,17 +184,17 @@ def format_elite_card(analysis_data: dict) -> str:
     return header + "\n\n" + "\n\n---\n\n".join(market_cards)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Agente ⚽️ Messi (V11.0 - O Tradutor) operacional.")
+    await update.message.reply_text("Agente ⚽️ Messi (V12.0 - O Detetive) operacional.")
 
 async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     prompt = update.message.text.replace(f"@{context.bot.username}", "").strip()
-    await update.message.reply_text("Solicitação V11.0 recebida. Consultando tradutor e A FONTE DA VERDADE...", reply_to_message_id=update.message.message_id)
+    await update.message.reply_text("Solicitação V12.0 recebida. Consultando tradutor e ativando DETETIVE IMPLACÁVEL...", reply_to_message_id=update.message.message_id)
     analysis_result = await arsenal_core_analysis(prompt)
     response_card = format_elite_card(analysis_result)
     await update.message.reply_text(response_card)
 
 def main() -> None:
-    logger.info("Iniciando processo principal (V11.0 - O Tradutor)...")
+    logger.info("Iniciando processo principal (V12.0 - O Detetive)...")
     if not initialize_api(): return
     
     token = os.getenv("TELEGRAM_BOT_TOKEN")
