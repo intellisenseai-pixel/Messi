@@ -1,41 +1,61 @@
-# ... (imports: os, logging, psycopg2, requests, etc.) ...
+import os
+import logging
+import threading
+import time
+import psycopg2
+import requests # Nova importação para chamadas de API
+import math
+from datetime import datetime
+from flask import Flask
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-def get_realtime_odds(home_team, away_team):
-    """Conecta-se à API-Football para obter as odds reais."""
+# --- Configuração do Logging ---
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- Módulo do Servidor Web Falso ---
+app = Flask(__name__)
+@app.route('/')
+def health_check():
+    return "Bot is alive and running.", 200
+def run_flask_app():
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# --- Módulo de Conexão com Banco de Dados ---
+def get_db_connection():
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        return conn
+    except Exception as e:
+        logger.error(f"Erro ao conectar ao banco de dados: {e}")
+        return None
+
+# --- MÓDULO DE DADOS DE MERCADO (API-FOOTBALL) ---
+def get_realtime_odds(home_team_name: str, away_team_name: str) -> dict:
+    """Conecta-se à API-Football para obter as odds reais de um jogo."""
     api_key = os.getenv("APIFOOTBALL_KEY")
-    # ... (código para fazer a chamada à API-Football, buscar o jogo e extrair as odds) ...
-    # Exemplo de retorno:
-    return {"odd_home": 2.20, "odd_draw": 3.20, "odd_away": 3.50, ...}
+    if not api_key:
+        logger.error("Chave da API-Football não encontrada.")
+        return None
 
-def get_team_strength(team_name, db_conn):
-    """Busca o perfil de força de um time no nosso banco de dados."""
-    with db_conn.cursor() as cur:
-        cur.execute("SELECT avg_goals_for, avg_goals_against FROM team_stats WHERE team_name = %s", (team_name,))
-        stats = cur.fetchone()
-        return stats
-
-def arsenal_core_analysis(prompt: str) -> dict:
-    # 1. Extrair times do prompt
-    # ...
+    # 1. Encontrar o ID dos times
+    # (A API-Football funciona melhor com IDs. Uma implementação real buscaria os IDs primeiro)
+    # Para simplificar, vamos assumir que a busca por nome funciona.
     
-    # 2. Obter Odds Reais da API
-    real_odds = get_realtime_odds(home_team_name, away_team_name)
-    if not real_odds: return {"error": "Não foi possível obter as odds de mercado para este jogo."}
-
-    # 3. Obter Força dos Times do nosso DB
-    conn = get_db_connection()
-    home_strength = get_team_strength(home_team_name, conn)
-    away_strength = get_team_strength(away_team_name, conn)
-    conn.close()
-    if not home_strength or not away_strength: return {"error": "Dados históricos de força não encontrados para os times."}
-
-    # 4. Calcular Probabilidades Reais (Poisson, etc.)
-    # lambda_home = home_strength['avg_goals_for'] * away_strength['avg_goals_against']
-    # ... (cálculos estatísticos) ...
-    
-    # 5. Aplicar Doutrina Soberana
-    # Para cada mercado, comparar a prob. calculada com a odd real e aplicar os 5 filtros.
-    # ...
-    
-    # 6. Gerar e retornar o card de análise
-    # ...
+    # 2. Buscar as odds para o jogo
+    # A API-Football requer o ID da liga e a temporada. Vamos usar valores de exemplo.
+    # Ex: Brasileirão Série A = 71, Temporada = 2025
+    try:
+        response = requests.get(
+            "https://v3.football.api-sports.io/odds",
+            headers={"x-apisports-key": api_key},
+            params={"league": "71", "season": "2025", "bookmaker": "8", "bet": "1"} # Bet365, Match Winner
+         )
+        response.raise_for_status()
+        odds_data = response.json()['response']
+        
+        # 3. Encontrar o jogo específico e retornar as odds
+        # (A lógica real aqui seria mais complexa, iterando sobre a resposta para encontrar o jogo certo)
+        # Para este exemplo, vamos 
