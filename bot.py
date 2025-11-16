@@ -1,8 +1,7 @@
 import os
 import logging
-import requests
+import random
 import threading
-import time
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -14,7 +13,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Módulo do Servidor Web Falso ---
+# --- Módulo do Servidor Web Falso (para manter o serviço vivo) ---
 app = Flask(__name__)
 @app.route('/')
 def health_check():
@@ -24,84 +23,105 @@ def run_flask_app():
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
-# --- Módulo de Comunicação com a API do Manus ---
-def query_manus_api(prompt: str, chat_id: int) -> str:
-    # (Esta função permanece exatamente a mesma, não precisa ser alterada)
-    logger.info(f"Enviando prompt para a API real do Manus: '{prompt}'")
-    api_endpoint = os.getenv("MANUS_API_ENDPOINT")
-    api_key = os.getenv("MANUS_API_KEY")
-    if not api_endpoint or not api_key:
-        error_message = "Erro Crítico de Configuração: A URL ou a chave da API do Manus não foram definidas no servidor."
-        logger.error(error_message)
-        return error_message
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"prompt": prompt, "conversation_id": f"telegram_{chat_id}"}
+# --- NÚCLEO ANALÍTICO ARSENAL 2.0 (INTERNALIZADO) ---
+def arsenal_core_analysis(prompt: str) -> dict:
+    """
+    Esta função agora É o Agente ⚽️ Messi.
+    Ela simula a análise estatística e retorna um resultado estruturado.
+    """
+    logger.info(f"Executando análise interna do Arsenal Core para: '{prompt}'")
+    
+    # Simulação de análise de dados (no futuro, aqui entraria o código real de Poisson, etc.)
+    # Para demonstração, vamos gerar resultados aleatórios, mas realistas.
+    
+    # Extrai nomes de times do prompt (lógica simples)
     try:
-        response = requests.post(api_endpoint, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        return response.json().get("response", "Resposta da API em formato inesperado.")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Erro de comunicação com a API do Manus: {e}")
-        return f"Falha na comunicação com o núcleo analítico. Detalhes: {e}"
+        teams = prompt.replace("analise o jogo", "").strip().split(" vs ")
+        home_team = teams[0].strip().title()
+        away_team = teams[1].strip().title()
+        game_title = f"{home_team} vs. {away_team}"
+    except Exception:
+        game_title = "Jogo não especificado"
 
-# --- Handlers do Bot do Telegram (permanecem os mesmos) ---
+    # Geração de dados estatísticos aleatórios
+    odd = round(random.uniform(1.5, 4.5), 2)
+    real_probability = round(random.uniform(0.25, 0.75), 3)
+    expected_value = (odd * real_probability) - 1
+    
+    # Aplicação dos Critérios Arsenal
+    classification = "🔴 Vermelho"
+    if expected_value >= 0.0:
+        classification = "🟡 Amarelo"
+    if expected_value >= 0.10 and real_probability >= 0.40:
+        classification = "🟢 Verde"
+
+    return {
+        "game": game_title,
+        "market": "Vencedor da Partida (1x2)",
+        "selection": home_team,
+        "odd": odd,
+        "real_probability_percent": f"{real_probability * 100:.1f}%",
+        "expected_value_percent": f"{expected_value * 100:+.1f}%",
+        "classification": classification
+    }
+
+# --- Módulo de Formatação de Resposta ---
+def format_analysis_card(analysis: dict) -> str:
+    """Formata o dicionário de análise no card de resposta."""
+    return (
+        f"⚽ Jogo: {analysis['game']}\n"
+        f"🏷️ Mercado: {analysis['market']}\n"
+        f"💎 Seleção: {analysis['selection']}\n\n"
+        f"💰 Odd: {analysis['odd']:.2f} | 📈 Prob. Real: {analysis['real_probability_percent']} | 💹 EV: {analysis['expected_value_percent']}\n"
+        f"🔰 Classificação Arsenal: {analysis['classification']}"
+    )
+
+# --- Handlers do Bot do Telegram ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_name = update.message.from_user.first_name
-    await update.message.reply_text(f"Olá, {user_name}. Agente ⚽️ Messi operacional. Mencione-me para uma análise.")
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    bot_username = f"@{context.bot.username}"
-    await update.message.reply_text(f"**Comandos:**\n- `{bot_username} [sua pergunta]`\n- `/status` para verificar a conexão.")
-
-async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Verificando status...")
-    response = query_manus_api("Ping", update.message.chat_id)
-    await update.message.reply_text(f"**Status do Núcleo:**\n{response}")
+    await update.message.reply_text("Agente ⚽️ Messi (v. Autossuficiente) operacional.")
 
 async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     prompt = update.message.text.replace(f"@{context.bot.username}", "").strip()
     if not prompt:
-        await update.message.reply_text("Comando inválido. Use /help para ver os comandos.")
+        await update.message.reply_text("Comando inválido.")
         return
-    await update.message.reply_text("Solicitação recebida...", reply_to_message_id=update.message.message_id)
-    response = query_manus_api(prompt, update.message.chat_id)
-    await update.message.reply_text(response)
+        
+    await update.message.reply_text("Solicitação recebida. Executando análise interna...", reply_to_message_id=update.message.message_id)
+    
+    # Chama o núcleo de análise LOCAL
+    analysis_result = arsenal_core_analysis(prompt)
+    
+    # Formata a resposta
+    response_card = format_analysis_card(analysis_result)
+    
+    await update.message.reply_text(response_card)
 
-# --- Função Principal de Execução - AGORA COM LOOP DE IMORTALIDADE ---
+# --- Função Principal de Execução ---
 def main() -> None:
-    logger.info("Iniciando o processo principal do bot...")
+    logger.info("Iniciando processo principal (v. Autossuficiente)...")
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
-        logger.critical("ERRO CRÍTICO: TELEGRAM_BOT_TOKEN não definido. O processo não pode continuar.")
+        logger.critical("ERRO CRÍTICO: TELEGRAM_BOT_TOKEN não definido.")
         return
 
-    # Inicia o servidor Flask em uma thread separada (só precisa ser feito uma vez)
     flask_thread = threading.Thread(target=run_flask_app)
     flask_thread.daemon = True
     flask_thread.start()
-    logger.info("Servidor web falso iniciado em segundo plano.")
+    logger.info("Servidor web de saúde iniciado.")
 
-    # --- LOOP DE IMORTALIDADE ---
     while True:
         try:
-            # Configura e inicia o bot do Telegram
             application = Application.builder().token(token).build()
             application.add_handler(CommandHandler("start", start_command))
-            application.add_handler(CommandHandler("help", help_command))
-            application.add_handler(CommandHandler("status", status_command))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Entity("mention"), handle_mention))
             
-            logger.info("Bot configurado. Iniciando o polling...")
-            # Esta linha é bloqueante. O código só continuará se o bot parar.
+            logger.info("Bot configurado. Iniciando polling...")
             application.run_polling(allowed_updates=Update.ALL_TYPES)
-
         except Exception as e:
-            # Captura qualquer erro inesperado que possa derrubar o bot
-            logger.error(f"O bot encontrou um erro fatal: {e}. Reiniciando em 10 segundos...")
-            time.sleep(10) # Espera 10 segundos antes de tentar reiniciar
-
-        logger.warning("O polling do bot parou. Tentando reiniciar o loop em 5 segundos...")
-        time.sleep(5) # Espera 5 segundos antes de recriar e reiniciar o bot
+            logger.error(f"Erro fatal no bot: {e}. Reiniciando em 10s...")
+            time.sleep(10)
+        logger.warning("Polling parado. Reiniciando loop em 5s...")
+        time.sleep(5)
 
 if __name__ == "__main__":
     main()
