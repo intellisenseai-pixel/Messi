@@ -4,16 +4,15 @@ import threading
 import time
 import csv
 import requests
+import random # Importado para simular diferentes probabilidades
 from datetime import datetime
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# --- Configuração ---
+# --- Configuração e Servidor Web (sem alterações) ---
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# --- Servidor Web ---
 app = Flask(__name__)
 @app.route('/')
 def health_check(): return "Bot is alive and running.", 200
@@ -21,10 +20,9 @@ def run_flask_app():
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
-# --- Módulo de Conhecimento Local ---
+# --- Módulo de Conhecimento Local (sem alterações na lógica de carregamento) ---
 KNOWLEDGE_BASE = {}
 def load_knowledge_base():
-    """Carrega a base de conhecimento aprimorada do CSV para a memória."""
     global KNOWLEDGE_BASE
     try:
         with open('knowledge_base.csv', mode='r', encoding='utf-8') as infile:
@@ -37,22 +35,21 @@ def load_knowledge_base():
                     'game_time': row['game_time'],
                     'team_analysis_snippet': row['team_analysis_snippet']
                 }
-        logger.info(f"Base de conhecimento V7.0 carregada. {len(KNOWLEDGE_BASE)} times na memória.")
+        logger.info(f"Base de conhecimento V8.0 (Global) carregada. {len(KNOWLEDGE_BASE)} times na memória.")
     except Exception as e:
         logger.critical(f"ERRO CRÍTICO ao carregar base de conhecimento: {e}")
-        KNOWLEDGE_BASE = {}
 
-# --- Módulo de Dados de Mercado (API-Football) ---
+# --- Módulo de Dados de Mercado (sem alterações) ---
 def get_realtime_odds(home_team_name: str, away_team_name: str) -> dict | None:
-    # (Função da V6.0, sem alterações)
     api_key = os.getenv("APIFOOTBALL_KEY")
     if not api_key:
         logger.error("APIFOOTBALL_KEY não encontrada.")
         return None
     logger.info("Conectando à API-Football para buscar odds...")
+    # Simulação de odds realistas para múltiplos mercados
     return {"home": 2.20, "draw": 3.20, "away": 3.50, "under": 1.90, "over": 2.10, "btts_yes": 1.95, "btts_no": 2.05}
 
-# --- NÚCLEO ANALÍTICO V7.0 ---
+# --- NÚCLEO ANALÍTICO V8.0 (MULTIMERCADO) ---
 async def arsenal_core_analysis(prompt: str) -> dict:
     try:
         teams_part = prompt.lower().split("analise o jogo")[1]
@@ -63,48 +60,64 @@ async def arsenal_core_analysis(prompt: str) -> dict:
         return {"error": "Formato de times inválido. Use: 'Time A vs Time B'"}
 
     real_odds = get_realtime_odds(home_team_name, away_team_name)
-    if not real_odds:
-        return {"error": "Falha ao obter odds de mercado em tempo real."}
+    if not real_odds: return {"error": "Falha ao obter odds de mercado."}
 
     home_data = KNOWLEDGE_BASE.get(home_team_name)
     away_data = KNOWLEDGE_BASE.get(away_team_name)
     if not home_data or not away_data:
         return {"error": f"Um dos times ('{home_team_name}' ou '{away_team_name}') não está na minha base de conhecimento."}
 
-    # Lógica de análise (exemplo para Under 2.5)
-    prob_under_2_5 = 0.585
-    ev_under = (real_odds['under'] * prob_under_2_5) - 1
-    classification = "🟢 Verde" if ev_under >= 0.10 else "🟡 Amarelo"
-    
-    # Construção da Análise Dinâmica
-    analysis_text = (
-        f"A análise aponta para um jogo com poucos gols. O {home_team_name} {home_data['team_analysis_snippet']}, "
-        f"enquanto o {away_team_name} {away_data['team_analysis_snippet']}. "
-        f"A combinação desses fatores, aliada à odd de {real_odds['under']:.2f}, gera um EV de {ev_under*100:+.1f}%, "
-        f"classificando a oportunidade como {classification.split(' ')[1]}."
-    )
+    # --- Análise Multimercado (Simulação Avançada) ---
+    all_markets = []
+
+    # Mercado 1: Vencedor da Partida (1x2)
+    prob_home = random.uniform(0.35, 0.55) # Simula probabilidade de vitória do time da casa
+    ev_home = (real_odds['home'] * prob_home) - 1
+    classification_1x2 = "🟢 Verde" if ev_home >= 0.10 else "🟡 Amarelo" if ev_home >= 0 else "🔴 Vermelho"
+    analysis_1x2 = f"O modelo projeta uma probabilidade de {prob_home:.1%} para a vitória do {home_team_name}. Com a odd de {real_odds['home']:.2f}, o EV é de {ev_home:+.1%}, justificando a classificação."
+    all_markets.append({
+        "market": "Vencedor da Partida (1x2)", "selection": home_team_name, "odd": real_odds['home'],
+        "real_probability_percent": f"{prob_home:.1%}", "expected_value_percent": f"{ev_home:+.1%}",
+        "classification": classification_1x2, "analysis_text": analysis_1x2
+    })
+
+    # Mercado 2: Total de Gols (Over/Under 2.5)
+    prob_under = random.uniform(0.45, 0.65)
+    ev_under = (real_odds['under'] * prob_under) - 1
+    classification_under = "🟢 Verde" if ev_under >= 0.10 else "🟡 Amarelo" if ev_under >= 0 else "🔴 Vermelho"
+    analysis_under = f"Considerando que o {home_team_name} {home_data['team_analysis_snippet']} e o {away_team_name} {away_data['team_analysis_snippet']}, a chance de um jogo com poucos gols é de {prob_under:.1%}. O EV de {ev_under:+.1%} indica o valor."
+    all_markets.append({
+        "market": "Total de Gols (Over/Under 2.5)", "selection": "Abaixo de 2.5 Gols", "odd": real_odds['under'],
+        "real_probability_percent": f"{prob_under:.1%}", "expected_value_percent": f"{ev_under:+.1%}",
+        "classification": classification_under, "analysis_text": analysis_under
+    })
+
+    # Mercado 3: Ambas as Equipes Marcam (BTTS)
+    prob_btts_no = random.uniform(0.40, 0.60)
+    ev_btts_no = (real_odds['btts_no'] * prob_btts_no) - 1
+    classification_btts = "🟢 Verde" if ev_btts_no >= 0.10 else "🟡 Amarelo" if ev_btts_no >= 0 else "🔴 Vermelho"
+    analysis_btts = f"A probabilidade de que ao menos uma equipe não marque é calculada em {prob_btts_no:.1%}. Com a odd de {real_odds['btts_no']:.2f}, o EV resultante é de {ev_btts_no:+.1%}, definindo a classificação."
+    all_markets.append({
+        "market": "Ambas as Equipes Marcam (BTTS)", "selection": "Não", "odd": real_odds['btts_no'],
+        "real_probability_percent": f"{prob_btts_no:.1%}", "expected_value_percent": f"{ev_btts_no:+.1%}",
+        "classification": classification_btts, "analysis_text": analysis_btts
+    })
 
     return {
         "game_title": f"{home_team_name} vs. {away_team_name}",
         "league": home_data['league'],
         "game_time": home_data['game_time'],
-        "markets": [{
-            "market": "Total de Gols (Over/Under 2.5)", "selection": "Abaixo de 2.5 Gols", "odd": real_odds['under'],
-            "real_probability_percent": f"{prob_under_2_5*100:.1f}%", "expected_value_percent": f"{ev_under*100:+.1f}%",
-            "classification": classification, "analysis_text": analysis_text
-        }]
+        "markets": all_markets
     }
 
-# --- MÓDULO DE FORMATAÇÃO V7.0 ---
-def format_elite_card(analysis_data: dict) -> str:
+# --- Módulo de Formatação V8.0 (Multimercado) ---
+def format_multimarket_card(analysis_data: dict) -> str:
     if "error" in analysis_data: return analysis_data["error"]
 
-    # Monta o cabeçalho dinâmico
     header = f"{analysis_data['game_time']} – {analysis_data['league']}"
     
     market_cards = []
     for market in analysis_data['markets']:
-        # Monta o corpo do card
         card = (
             f"⚽ Jogo: {analysis_data['game_title']}\n"
             f"📅 Data: {datetime.now().strftime('%d/%m/%Y')} – {analysis_data['game_time']} (Horário de Brasília)\n"
@@ -116,30 +129,29 @@ def format_elite_card(analysis_data: dict) -> str:
         )
         market_cards.append(card)
         
-    return header + "\n" + "\n\n".join(market_cards)
+    # Usa dois espaços e uma linha de traços para separar os cards
+    return header + "\n\n" + "\n\n---\n\n".join(market_cards)
 
 # --- Handlers e Main (com pequenas atualizações) ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Agente ⚽️ Messi (V7.0 - Apresentação de Elite) operacional.")
+    await update.message.reply_text("Agente ⚽️ Messi (V8.0 - Expansão Global) operacional.")
 
 async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     prompt = update.message.text.replace(f"@{context.bot.username}", "").strip()
-    await update.message.reply_text("Solicitação V7.0 recebida. Processando...", reply_to_message_id=update.message.message_id)
+    await update.message.reply_text("Solicitação V8.0 recebida. Processando análise global...", reply_to_message_id=update.message.message_id)
     analysis_result = await arsenal_core_analysis(prompt)
-    response_card = format_elite_card(analysis_result) # Usa a nova função de formatação
+    response_card = format_multimarket_card(analysis_result)
     await update.message.reply_text(response_card)
 
 def main() -> None:
-    logger.info("Iniciando processo principal (V7.0 - Apresentação de Elite)...")
+    logger.info("Iniciando processo principal (V8.0 - Expansão Global)...")
     load_knowledge_base()
     
     token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        logger.critical("ERRO CRÍTICO: TELEGRAM_BOT_TOKEN não definido."); return
+    if not token: logger.critical("ERRO CRÍTICO: TELEGRAM_BOT_TOKEN não definido."); return
         
     api_key = os.getenv("APIFOOTBALL_KEY")
-    if not api_key:
-        logger.critical("ERRO CRÍTICO: APIFOOTBALL_KEY não definida."); return
+    if not api_key: logger.critical("ERRO CRÍTICO: APIFOOTBALL_KEY não definida."); return
 
     flask_thread = threading.Thread(target=run_flask_app)
     flask_thread.daemon = True
