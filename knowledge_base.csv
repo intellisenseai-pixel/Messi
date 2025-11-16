@@ -1,5 +1,20 @@
 team_name,avg_goals_for,avg_goals_against,league,game_time,team_analysis_snippet
-Palmeiras,1.8,0.9,Brasileirão Série A,21:00,possui um dos elencos mais fortes do país e uma defesa muito disciplinada
-Corinthians,1.1,1.0,Brasileirão Série A,21:00,é conhecido por jogos táticos e uma defesa que sofre poucos gols
-Red Bull Bragantino,1.9,1.2,Brasileirão Série A,18:30,tem um estilo de jogo ofensivo e agressivo, marcando muitos gols
-Atlético Mineiro,1.7,0.8,Brasileirão Série A,18:30,combina um ataque poderoso com uma das defesas mais sólidas do campeonato
+Manchester City,2.5,0.8,Premier League,12:00,domina a posse de bola e possui um ataque cirúrgico
+Liverpool,2.2,1.0,Premier League,12:00,é conhecido por sua pressão intensa e transições rápidas
+Arsenal,2.0,1.1,Premier League,14:30,apresenta um futebol jovem, dinâmico e com um ataque veloz
+Manchester United,1.7,1.3,Premier League,14:30,tem um forte poder de contra-ataque e individualidades que decidem
+Chelsea,1.6,1.2,Premier League,17:00,prioriza uma estrutura defensiva sólida e busca eficiência no ataque
+Real Madrid,2.4,0.9,La Liga,16:00,é letal nos contra-ataques e tem jogadores com imenso poder de decisão
+Barcelona,2.1,0.8,La Liga,16:00,baseia seu jogo no controle da posse de bola e na técnica apurada
+Atlético de Madrid,1.5,0.7,La Liga,13:00,é famoso por ter uma das defesas mais impenetráveis do mundo
+Bayern de Munique,3.0,1.1,Bundesliga,11:30,possui um rolo compressor ofensivo e um ritmo de jogo avassalador
+Borussia Dortmund,2.3,1.5,Bundesliga,11:30,aposta em um jogo vertical, rápido e com muitos jovens talentos
+Juventus,1.8,0.9,Serie A,15:45,tem uma tradição de solidez defensiva e organização tática
+Inter de Milão,2.1,1.0,Serie A,15:45,combina força física com um ataque muito eficiente
+Milan,1.9,1.2,Serie A,17:00,mescla a experiência de seus veteranos com a energia de jovens promissores
+PSG,2.8,1.0,Ligue 1,16:00,conta com um dos ataques mais estrelados e talentosos do planeta
+Flamengo,1.9,1.1,Brasileirão Betano,21:00,tem um elenco recheado de estrelas e um forte volume de jogo ofensivo
+Palmeiras,1.8,0.9,Brasileirão Betano,21:00,possui um dos elencos mais fortes do país e uma defesa muito disciplinada
+Corinthians,1.1,1.0,Brasileirão Betano,21:00,é conhecido por jogos táticos e uma defesa que sofre poucos gols
+Red Bull Bragantino,1.9,1.2,Brasileirão Betano,19:00,tem um estilo de jogo ofensivo e agressivo, marcando muitos gols
+Atlético Mineiro,1.7,0.8,Brasileirão Betano,19:00,combina um ataque poderoso com uma das defesas mais sólidas do campeonato
