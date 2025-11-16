@@ -46,15 +46,13 @@ def get_game_data_from_api(home_team_name: str, away_team_name: str) -> dict | N
     # Para garantir que o bot funcione para QUALQUER time, vamos simular uma resposta bem-sucedida.
     # Se os times não forem "conhecidos", retornamos dados genéricos.
     if "Real Madrid" in home_team_name:
-        # Simula um clássico com muitos gols
         return {
             "league": "La Liga", "game_time": "16:00",
             "odds": {"home": 2.40, "draw": 3.50, "away": 2.90, "under": 2.20, "over": 1.80, "btts_yes": 1.70, "btts_no": 2.10},
             "home_stats": {"avg_goals_for": 2.4, "avg_goals_against": 0.9},
             "away_stats": {"avg_goals_for": 2.1, "avg_goals_against": 0.8}
         }
-    else:
-        # Simula um jogo genérico, como Hungria vs Irlanda
+    else: # Simula um jogo genérico, como Hungria vs Irlanda
         return {
             "league": "Amistoso Internacional", "game_time": "15:45",
             "odds": {"home": 2.50, "draw": 3.10, "away": 3.00, "under": 1.75, "over": 2.25, "btts_yes": 1.90, "btts_no": 1.90},
@@ -72,7 +70,6 @@ async def arsenal_core_analysis(prompt: str) -> dict:
     except Exception:
         return {"error": "Formato de times inválido. Use: 'Time A vs Time B'"}
 
-    # Passo Único: Obter todos os dados da API
     game_data = get_game_data_from_api(home_team_name, away_team_name)
     if not game_data:
         return {"error": "Falha na comunicação com a API de dados esportivos."}
@@ -81,27 +78,21 @@ async def arsenal_core_analysis(prompt: str) -> dict:
     home_stats = game_data["home_stats"]
     away_stats = game_data["away_stats"]
 
-    # --- Análise Multimercado com dados reais (simulados) da API ---
     all_markets = []
     
-    # Mercado: Total de Gols (Over/Under 2.5)
-    # Simulação de Poisson simplificada
+    # Simulação de análise para Under 2.5
     lambda_home = home_stats['avg_goals_for'] * away_stats['avg_goals_against']
     lambda_away = away_stats['avg_goals_for'] * home_stats['avg_goals_against']
     expected_total_goals = lambda_home + lambda_away
-    
-    # Lógica simples: se o total esperado for baixo, a prob de under é alta.
-    prob_under = 1 - (expected_total_goals / 5) # Fórmula de simulação
+    prob_under = 1 - (expected_total_goals / 5)
     ev_under = (real_odds['under'] * prob_under) - 1
     classification_under = "🟢 Verde" if ev_under >= 0.10 else "🟡 Amarelo" if ev_under >= 0 else "🔴 Vermelho"
-    analysis_under = f"Com uma média de gols esperada de {expected_total_goals:.2f} para a partida, a probabilidade de 'Abaixo de 2.5' é estimada em {prob_under:.1%}. Isso gera um EV de {ev_under:+.1%}."
+    analysis_under = f"Com uma média de gols esperada de {expected_total_goals:.2f}, a probabilidade de 'Abaixo de 2.5' é estimada em {prob_under:.1%}. Isso gera um EV de {ev_under:+.1%}."
     all_markets.append({
         "market": "Total de Gols (Over/Under 2.5)", "selection": "Abaixo de 2.5 Gols", "odd": real_odds['under'],
         "real_probability_percent": f"{prob_under:.1%}", "expected_value_percent": f"{ev_under:+.1%}",
         "classification": classification_under, "analysis_text": analysis_under
     })
-    
-    # (Lógica similar seria aplicada para os outros mercados)
 
     return {
         "game_title": f"{home_team_name} vs. {away_team_name}",
@@ -110,7 +101,7 @@ async def arsenal_core_analysis(prompt: str) -> dict:
         "markets": all_markets
     }
 
-# --- Módulos de Formatação e Execução (sem alterações na formatação) ---
+# --- Módulos de Formatação e Execução ---
 def format_elite_card(analysis_data: dict) -> str:
     if "error" in analysis_data: return analysis_data["error"]
     header = f"{analysis_data['game_time']} – {analysis_data['league']}"
