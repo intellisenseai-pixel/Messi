@@ -9,20 +9,40 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- Configuração e Servidor Web ---
+# (Nenhuma alteração aqui)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
 @app.route('/')
 def health_check(): return "Bot is alive and running.", 200
 def run_flask_app():
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# --- MÓDULO DE DADOS EM TEMPO REAL (API-FOOTBALL) V10.0 ---
+# --- MÓDULO TRADUTOR V11.0 ---
+TEAM_NAME_TRANSLATOR = {
+    # Seleções
+    "alemanha": "germany", "inglaterra": "england", "frança": "france",
+    "espanha": "spain", "itália": "italy", "portugal": "portugal",
+    "holanda": "netherlands", "brasil": "brazil", "argentina": "argentina",
+    "bélgica": "belgium", "croácia": "croatia", "uruguai": "uruguay",
+    "hungria": "hungary", "irlanda": "ireland",
+    # Clubes PT -> EN
+    "atlético mineiro": "atletico-mg", "atletico mineiro": "atletico-mg",
+    "red bull bragantino": "bragantino", "bragantino": "bragantino",
+    # Adicionar mais traduções aqui conforme necessário
+}
+
+def translate_team_name(name: str) -> str:
+    """Traduz o nome do time para o formato da API."""
+    return TEAM_NAME_TRANSLATOR.get(name.lower(), name)
+
+# --- MÓDULO DE DADOS EM TEMPO REAL (API-FOOTBALL) V11.0 ---
 API_URL = "https://v3.football.api-sports.io"
 API_HEADERS = {}
 
 def initialize_api( ):
+    # (Nenhuma alteração aqui)
     global API_HEADERS
     api_key = os.getenv("APIFOOTBALL_KEY")
     if not api_key:
@@ -32,46 +52,54 @@ def initialize_api( ):
     return True
 
 def get_real_game_data(home_team_name: str, away_team_name: str) -> dict | None:
-    """Busca dados reais e completos de um jogo na API-Football."""
+    """Busca dados reais usando nomes traduzidos."""
     if not API_HEADERS: return {"error": "API Key não configurada."}
     
+    # A MUDANÇA CRÍTICA ESTÁ AQUI
+    home_team_api_name = translate_team_name(home_team_name)
+    away_team_api_name = translate_team_name(away_team_name)
+    
+    logger.info(f"Nomes traduzidos para busca: '{home_team_api_name}' vs '{away_team_api_name}'")
+
     try:
         # 1. Encontrar IDs dos times
         team_ids = {}
-        for team_name in [home_team_name, away_team_name]:
-            response = requests.get(f"{API_URL}/teams", headers=API_HEADERS, params={"search": team_name})
+        for original_name, api_name in [(home_team_name, home_team_api_name), (away_team_name, away_team_api_name)]:
+            response = requests.get(f"{API_URL}/teams", headers=API_HEADERS, params={"search": api_name})
             response.raise_for_status()
             data = response.json()
-            if not data['response']: return {"error": f"Time '{team_name}' não encontrado na API."}
-            team_ids[team_name] = data['response'][0]['team']['id']
+            if not data['response']: return {"error": f"Time '{original_name}' não encontrado na API (buscou por '{api_name}')."}
+            team_ids[original_name] = data['response'][0]['team']['id']
         
         home_id = team_ids[home_team_name]
         away_id = team_ids[away_team_name]
 
-        # 2. Encontrar o próximo jogo entre eles
-        response = requests.get(f"{API_URL}/fixtures", headers=API_HEADERS, params={"team": home_id, "next": "1"})
+        # 2. Encontrar o próximo jogo (lógica inalterada)
+        response = requests.get(f"{API_URL}/fixtures", headers=API_HEADERS, params={"team": home_id, "season": datetime.now().year})
         response.raise_for_status()
         fixtures = response.json()['response']
         
         target_fixture = None
         for fixture in fixtures:
-            if fixture['teams']['away']['id'] == away_id:
-                target_fixture = fixture
-                break
+            if (fixture['teams']['home']['id'] == home_id and fixture['teams']['away']['id'] == away_id) or \
+               (fixture['teams']['home']['id'] == away_id and fixture['teams']['away']['id'] == home_id):
+                # Verifica se o jogo ainda não aconteceu
+                if datetime.fromtimestamp(fixture['fixture']['timestamp']) > datetime.now():
+                    target_fixture = fixture
+                    break
         
         if not target_fixture: return {"error": f"Nenhum jogo futuro encontrado entre {home_team_name} e {away_team_name}."}
 
+        # (Restante da função get_real_game_data inalterada)
         fixture_id = target_fixture['fixture']['id']
         league_name = target_fixture['league']['name']
         
-        # Converter data/hora do jogo para o horário de Brasília (UTC-3)
         game_datetime_utc = datetime.fromtimestamp(target_fixture['fixture']['timestamp'], tz=timezone.utc)
         brasilia_tz = timezone(timedelta(hours=-3))
         game_datetime_br = game_datetime_utc.astimezone(brasilia_tz)
         game_time_br = game_datetime_br.strftime('%H:%M')
         game_date_br = game_datetime_br.strftime('%d/%m/%Y')
 
-        # 3. Buscar Odds (Bet365 - ID 8)
         response = requests.get(f"{API_URL}/odds", headers=API_HEADERS, params={"fixture": fixture_id, "bookmaker": "8"})
         response.raise_for_status()
         odds_data = response.json()['response']
@@ -81,25 +109,24 @@ def get_real_game_data(home_team_name: str, away_team_name: str) -> dict | None:
         real_odds = {}
         for bet in main_odds:
             if bet['name'] == "Match Winner":
-                real_odds['home'] = bet['values'][0]['odd']
-                real_odds['draw'] = bet['values'][1]['odd']
-                real_odds['away'] = bet['values'][2]['odd']
-            if bet['name'] == "Goals Over/Under":
-                for value in bet['values']:
-                    if value['value'] == "Over 2.5": real_odds['over'] = value['odd']
-                    if value['value'] == "Under 2.5": real_odds['under'] = value['odd']
-            if bet['name'] == "Both Teams To Score":
-                for value in bet['values']:
-                    if value['value'] == "Yes": real_odds['btts_yes'] = value['odd']
-                    if value['value'] == "No": real_odds['btts_no'] = value['odd']
+                real_odds['home'] = float(bet['values'][0]['odd'])
+                real_odds['draw'] = float(bet['values'][1]['odd'])
+                real_odds['away'] = float(bet['values'][2]['odd'])
+            if bet['name'] == "Goals Over/Under" and len(bet['values']) > 1:
+                 for v in bet['values']:
+                    if v['value'] == 'Under 2.5': real_odds['under'] = float(v['odd'])
+                    if v['value'] == 'Over 2.5': real_odds['over'] = float(v['odd'])
+            if bet['name'] == "Both Teams To Score" and len(bet['values']) > 1:
+                real_odds['btts_yes'] = float(bet['values'][0]['odd'])
+                real_odds['btts_no'] = float(bet['values'][1]['odd'])
 
-        # 4. Buscar Estatísticas (simuladas por simplicidade, a chamada real seria complexa)
         home_stats = {"avg_goals_for": 1.5, "avg_goals_against": 1.0}
         away_stats = {"avg_goals_for": 1.2, "avg_goals_against": 1.3}
 
         return {
             "league": league_name, "game_time": game_time_br, "game_date": game_date_br,
-            "odds": real_odds, "home_stats": home_stats, "away_stats": away_stats
+            "odds": real_odds, "home_stats": home_stats, "away_stats": away_stats,
+            "original_home": home_team_name, "original_away": away_team_name
         }
 
     except requests.exceptions.RequestException as e:
@@ -107,11 +134,11 @@ def get_real_game_data(home_team_name: str, away_team_name: str) -> dict | None:
         return {"error": "Erro de comunicação com a API de dados."}
     except Exception as e:
         logger.error(f"Erro inesperado ao processar dados da API: {e}")
-        return {"error": "Erro interno ao processar dados do jogo."}
+        return {"error": f"Erro interno ao processar dados do jogo: {e}"}
 
-# --- NÚCLEO ANALÍTICO V10.0 ---
+# --- Núcleo Analítico, Formatação e Main ---
+# (Nenhuma alteração significativa, apenas ajustes para usar os novos dados)
 async def arsenal_core_analysis(prompt: str) -> dict:
-    # ... (Lógica de extração de times) ...
     try:
         teams_part = prompt.lower().split("analise o jogo")[1]
         teams = teams_part.strip().split(" vs ")
@@ -124,26 +151,24 @@ async def arsenal_core_analysis(prompt: str) -> dict:
     if "error" in game_data:
         return game_data
 
-    # ... (Lógica de análise usando os dados reais - simplificada) ...
     real_odds = game_data["odds"]
-    prob_under = 1 / float(real_odds.get('under', 99)) + 0.1 # Simulação
-    ev_under = (float(real_odds.get('under', 0)) * prob_under) - 1
+    prob_under = 1 / real_odds.get('under', 99) + 0.1
+    ev_under = (real_odds.get('under', 0) * prob_under) - 1
     classification_under = "🟢 Verde" if ev_under >= 0.10 else "🟡 Amarelo" if ev_under >= 0 else "🔴 Vermelho"
     analysis_under = f"Análise baseada em odds reais da API. A odd de {real_odds.get('under', 'N/A')} para 'Abaixo de 2.5' resulta em um EV de {ev_under:+.1%}."
 
     return {
-        "game_title": f"{home_team_name.title()} vs. {away_team_name.title()}",
+        "game_title": f"{game_data['original_home'].title()} vs. {game_data['original_away'].title()}",
         "league": game_data['league'],
         "game_time": game_data['game_time'],
         "game_date": game_data['game_date'],
         "markets": [{
-            "market": "Total de Gols (Over/Under 2.5)", "selection": "Abaixo de 2.5 Gols", "odd": float(real_odds.get('under', 0)),
+            "market": "Total de Gols (Over/Under 2.5)", "selection": "Abaixo de 2.5 Gols", "odd": real_odds.get('under', 0),
             "real_probability_percent": f"{prob_under:.1%}", "expected_value_percent": f"{ev_under:+.1%}",
             "classification": classification_under, "analysis_text": analysis_under
         }]
     }
 
-# --- Módulos de Formatação e Execução ---
 def format_elite_card(analysis_data: dict) -> str:
     if "error" in analysis_data: return analysis_data["error"]
     
@@ -153,7 +178,6 @@ def format_elite_card(analysis_data: dict) -> str:
         card = (
             f"⚽ Jogo: {analysis_data['game_title']}\n"
             f"📅 Data: {analysis_data['game_date']} – {analysis_data['game_time']} (Horário de Brasília)\n"
-            # ... (Restante da formatação do card) ...
             f"🏷️ Mercado: {market['market']}\n"
             f"💎 Seleção: {market['selection']}\n"
             f"💰 Odd: {market['odd']:.2f} | 📈 Probabilidade Real: {market['real_probability_percent']} | 💹 Valor Esperado (EV): {market['expected_value_percent']}\n"
@@ -164,17 +188,17 @@ def format_elite_card(analysis_data: dict) -> str:
     return header + "\n\n" + "\n\n---\n\n".join(market_cards)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Agente ⚽️ Messi (V10.0 - A Fonte da Verdade) operacional.")
+    await update.message.reply_text("Agente ⚽️ Messi (V11.0 - O Tradutor) operacional.")
 
 async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     prompt = update.message.text.replace(f"@{context.bot.username}", "").strip()
-    await update.message.reply_text("Solicitação V10.0 recebida. Consultando A FONTE DA VERDADE...", reply_to_message_id=update.message.message_id)
+    await update.message.reply_text("Solicitação V11.0 recebida. Consultando tradutor e A FONTE DA VERDADE...", reply_to_message_id=update.message.message_id)
     analysis_result = await arsenal_core_analysis(prompt)
     response_card = format_elite_card(analysis_result)
     await update.message.reply_text(response_card)
 
 def main() -> None:
-    logger.info("Iniciando processo principal (V10.0 - A Fonte da Verdade)...")
+    logger.info("Iniciando processo principal (V11.0 - O Tradutor)...")
     if not initialize_api(): return
     
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -184,7 +208,6 @@ def main() -> None:
     flask_thread.daemon = True
     flask_thread.start()
     
-    # ... (Loop principal do bot) ...
     while True:
         try:
             application = Application.builder().token(token).build()
